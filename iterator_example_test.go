@@ -27,6 +27,8 @@ package mapset
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 type yourType struct {
@@ -47,7 +49,7 @@ func (i yourType) Key() string {
 }
 
 func Test_ExampleIterator(t *testing.T) {
-
+	r := require.New(t)
 	s := NewSet(
 		[]*yourType{
 			{name: "Alise"},
@@ -67,7 +69,6 @@ func Test_ExampleIterator(t *testing.T) {
 		}
 	}
 
-	if found == nil || found.name != "John" {
-		t.Fatalf("expected iterator to have found `John` record but got nil or something else")
-	}
+	r.NotNil(found)
+	r.Equal("John", found.name, "expected iterator to have found `John` record but got nil or something else")
 }

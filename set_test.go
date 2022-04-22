@@ -28,6 +28,8 @@ package mapset
 import (
 	"strconv"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 type Int int
@@ -61,161 +63,133 @@ func makeUnsafeSetInt(ints []Int) Set[Int] {
 	return s
 }
 
-func assertEqual[T EqualKeyer](a, b Set[T], t *testing.T) {
-	if !a.Equal(b) {
-		t.Errorf("%v != %v\n", a, b)
-	}
+func assertEqual[T EqualKeyer](a, b Set[T], r *require.Assertions) {
+	r.Truef(a.Equal(b), "Expected no difference, got: %v", a.Difference(b))
 }
 
 func Test_NewSet(t *testing.T) {
+	r := require.New(t)
 	a := NewSet[Int]()
-	if a.Cardinality() != 0 {
-		t.Error("NewSet should start out as an empty set")
-	}
+	r.Zero(a.Cardinality(), "NewSet shout start out as an empty set")
 
-	assertEqual(NewSet([]Int{}...), NewSet[Int](), t)
-	assertEqual(NewSet([]Int{1}...), NewSet(Int(1)), t)
-	assertEqual(NewSet([]Int{1, 2}...), NewSet(Int(1), Int(2)), t)
-	assertEqual(NewSet([]String{"a"}...), NewSet(String("a")), t)
-	assertEqual(NewSet([]String{"a", "b"}...), NewSet(String("a"), String("b")), t)
+	assertEqual(NewSet([]Int{}...), NewSet[Int](), r)
+	assertEqual(NewSet([]Int{1}...), NewSet(Int(1)), r)
+	assertEqual(NewSet([]Int{1, 2}...), NewSet(Int(1), Int(2)), r)
+	assertEqual(NewSet([]String{"a"}...), NewSet(String("a")), r)
+	assertEqual(NewSet([]String{"a", "b"}...), NewSet(String("a"), String("b")), r)
 }
 
 func Test_NewUnsafeSet(t *testing.T) {
+	r := require.New(t)
 	a := NewThreadUnsafeSet[Int]()
-
-	if a.Cardinality() != 0 {
-		t.Error("NewSet should start out as an empty set")
-	}
+	r.Zero(a.Cardinality(), "NewSet shout start out as an empty set")
 }
 
 func Test_AddSet(t *testing.T) {
+	r := require.New(t)
 	a := makeSetInt([]Int{1, 2, 3})
-
-	if a.Cardinality() != 3 {
-		t.Error("AddSet does not have a size of 3 even though 3 items were added to a new set")
-	}
+	r.Equal(3, a.Cardinality(), "AddSet does not have a size of 3 even though 3 items were added to a new set")
 }
 
 func Test_AddUnsafeSet(t *testing.T) {
+	r := require.New(t)
 	a := makeUnsafeSetInt([]Int{1, 2, 3})
-
-	if a.Cardinality() != 3 {
-		t.Error("AddSet does not have a size of 3 even though 3 items were added to a new set")
-	}
+	r.Equal(3, a.Cardinality(), "AddSet does not have a size of 3 even though 3 items were added to a new set")
 }
 
 func Test_AddSetNoDuplicate(t *testing.T) {
+	r := require.New(t)
 	a := makeSetInt([]Int{7, 5, 3, 7})
 
-	if a.Cardinality() != 3 {
-		t.Error("AddSetNoDuplicate set should have 3 elements since 7 is a duplicate")
-	}
+	r.Equal(3, a.Cardinality(), "AddSetNoDuplicate set should have 3 elements since 7 is a duplicate")
 
-	if !(a.Contains(7) && a.Contains(5) && a.Contains(3)) {
-		t.Error("AddSetNoDuplicate set should have a 7, 5, and 3 in it.")
-	}
+	b := makeSetInt([]Int{5, 3, 7})
+	r.True(b.Equal(a), "AddSetNoDuplicate set should have a 7, 5, and 3 in it.")
 }
 
 func Test_AddUnsafeSetNoDuplicate(t *testing.T) {
+	r := require.New(t)
 	a := makeUnsafeSetInt([]Int{7, 5, 3, 7})
 
-	if a.Cardinality() != 3 {
-		t.Error("AddSetNoDuplicate set should have 3 elements since 7 is a duplicate")
-	}
+	r.Equal(3, a.Cardinality(), "AddSetNoDuplicate set should have 3 elements since 7 is a duplicate")
 
-	if !(a.Contains(7) && a.Contains(5) && a.Contains(3)) {
-		t.Error("AddSetNoDuplicate set should have a 7, 5, and 3 in it.")
-	}
+	b := makeUnsafeSetInt([]Int{5, 3, 7})
+	r.True(b.Equal(a), "AddSetNoDuplicate set should have a 7, 5, and 3 in it.")
 }
 
 func Test_RemoveSet(t *testing.T) {
+	r := require.New(t)
 	a := makeSetInt([]Int{6, 3, 1})
 
 	a.Remove(3)
 
-	if a.Cardinality() != 2 {
-		t.Error("RemoveSet should only have 2 items in the set")
-	}
+	r.Equal(2, a.Cardinality(), "RemoveSet should only have 2 elements in the set")
 
-	if !(a.Contains(6) && a.Contains(1)) {
-		t.Error("RemoveSet should have only items 6 and 1 in the set")
-	}
+	b := makeSetInt([]Int{6, 1})
+	r.True(b.Equal(a), "RemoveSet set should have a 6 and 1 in it.")
 
 	a.Remove(6)
 	a.Remove(1)
 
-	if a.Cardinality() != 0 {
-		t.Error("RemoveSet should be an empty set after removing 6 and 1")
-	}
+	r.Zero(a.Cardinality(), "RemoveSet should be an empty set after removing 6 and 1")
 }
 
 func Test_RemoveUnsafeSet(t *testing.T) {
+	r := require.New(t)
 	a := makeUnsafeSetInt([]Int{6, 3, 1})
 
 	a.Remove(3)
 
-	if a.Cardinality() != 2 {
-		t.Error("RemoveSet should only have 2 items in the set")
-	}
+	r.Equal(2, a.Cardinality(), "RemoveUnsafeSet should only have 2 elements in the set")
 
-	if !(a.Contains(6) && a.Contains(1)) {
-		t.Error("RemoveSet should have only items 6 and 1 in the set")
-	}
+	b := makeUnsafeSetInt([]Int{6, 1})
+	r.True(b.Equal(a), "RemoveUnsafeSet set should have a 6 and 1 in it.")
 
 	a.Remove(6)
 	a.Remove(1)
 
-	if a.Cardinality() != 0 {
-		t.Error("RemoveSet should be an empty set after removing 6 and 1")
-	}
+	r.Zero(a.Cardinality(), "RemoveUnsafeSet should be an empty set after removing 6 and 1")
 }
 
 func Test_ContainsSet(t *testing.T) {
+	r := require.New(t)
 	a := NewSet[Int]()
 
 	a.Add(71)
 
-	if !a.Contains(71) {
-		t.Error("ContainsSet should contain 71")
-	}
+	r.True(a.Contains(71), "ContainsSet should contain 71")
 
 	a.Remove(71)
 
-	if a.Contains(71) {
-		t.Error("ContainsSet should not contain 71")
-	}
+	r.False(a.Contains(71), "ContainsSet should not contain 71")
 
 	a.Add(13)
 	a.Add(7)
 	a.Add(1)
 
-	if !(a.Contains(13) && a.Contains(7) && a.Contains(1)) {
-		t.Error("ContainsSet should contain 13, 7, 1")
-	}
-}
+	b := makeSetInt([]Int{13, 7, 1})
+	r.Truef(b.Equal(a), "ContainsSet should contain 13, 7, 1, got: %+v", b.Difference(a))
 
+}
 func Test_ContainsUnsafeSet(t *testing.T) {
-	a := NewThreadUnsafeSet[Int]()
+	r := require.New(t)
+	a := NewSet[Int]()
 
 	a.Add(71)
 
-	if !a.Contains(71) {
-		t.Error("ContainsSet should contain 71")
-	}
+	r.True(a.Contains(71), "ContainsUnsafeSet should contain 71")
 
 	a.Remove(71)
 
-	if a.Contains(71) {
-		t.Error("ContainsSet should not contain 71")
-	}
+	r.False(a.Contains(71), "ContainsUnsafeSet should not contain 71")
 
 	a.Add(13)
 	a.Add(7)
 	a.Add(1)
 
-	if !(a.Contains(13) && a.Contains(7) && a.Contains(1)) {
-		t.Error("ContainsSet should contain 13, 7, 1")
-	}
+	b := makeSetInt([]Int{13, 7, 1})
+	r.Truef(b.Equal(a), "ContainsUnsafeSet should contain 13, 7, 1, got: %+v", b.Difference(a))
+
 }
 
 func Test_ContainsMultipleSet(t *testing.T) {

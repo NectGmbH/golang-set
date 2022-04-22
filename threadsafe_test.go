@@ -32,11 +32,14 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 const N = 1000
 
 func Test_AddConcurrent(t *testing.T) {
+	r := require.New(t)
 	runtime.GOMAXPROCS(2)
 
 	s := NewSet[Int]()
@@ -53,13 +56,12 @@ func Test_AddConcurrent(t *testing.T) {
 
 	wg.Wait()
 	for _, i := range ints {
-		if !s.Contains(Int(i)) {
-			t.Errorf("Set is missing element: %v", i)
-		}
+		r.Truef(s.Contains(Int(i)), "Set is missing element: %v", i)
 	}
 }
 
 func Test_CardinalityConcurrent(t *testing.T) {
+	r := require.New(t)
 	runtime.GOMAXPROCS(2)
 
 	s := NewSet[Int]()
@@ -69,10 +71,7 @@ func Test_CardinalityConcurrent(t *testing.T) {
 	go func() {
 		elems := s.Cardinality()
 		for i := 0; i < N; i++ {
-			newElems := s.Cardinality()
-			if newElems < elems {
-				t.Errorf("Cardinality shrunk from %v to %v", elems, newElems)
-			}
+			r.GreaterOrEqual(s.Cardinality(), elems, "cardinality shrunk")
 		}
 		wg.Done()
 	}()
@@ -296,6 +295,8 @@ func Test_IsProperSupersetConcurrent(t *testing.T) {
 }
 
 func Test_EachConcurrent(t *testing.T) {
+	r := require.New(t)
+
 	runtime.GOMAXPROCS(2)
 	concurrent := 10
 
@@ -319,9 +320,7 @@ func Test_EachConcurrent(t *testing.T) {
 	}
 	wg.Wait()
 
-	if count != int64(N*concurrent) {
-		t.Errorf("%v != %v", count, int64(N*concurrent))
-	}
+	r.Equal(count, int64(N*concurrent), "count mismatch")
 }
 
 func Test_IterConcurrent(t *testing.T) {
@@ -358,6 +357,7 @@ func Test_IterConcurrent(t *testing.T) {
 }
 
 func Test_RemoveConcurrent(t *testing.T) {
+	r := require.New(t)
 	runtime.GOMAXPROCS(2)
 
 	s := NewSet[Int]()
@@ -376,9 +376,7 @@ func Test_RemoveConcurrent(t *testing.T) {
 	}
 	wg.Wait()
 
-	if s.Cardinality() != 0 {
-		t.Errorf("Expected cardinality 0; got %v", s.Cardinality())
-	}
+	r.Zero(s.Cardinality(), "cardinality not zero after removing all elems")
 }
 
 func Test_StringConcurrent(t *testing.T) {
@@ -423,6 +421,7 @@ func Test_SymmetricDifferenceConcurrent(t *testing.T) {
 }
 
 func Test_ToSlice(t *testing.T) {
+	r := require.New(t)
 	runtime.GOMAXPROCS(2)
 
 	s := NewSet[Int]()
@@ -439,14 +438,10 @@ func Test_ToSlice(t *testing.T) {
 
 	wg.Wait()
 	setAsSlice := s.ToSlice()
-	if len(setAsSlice) != s.Cardinality() {
-		t.Errorf("Set length is incorrect: %v", len(setAsSlice))
-	}
+	r.Equal(len(setAsSlice), s.Cardinality(), "set length is incorrect")
 
 	for _, i := range setAsSlice {
-		if !s.Contains(i) {
-			t.Errorf("Set is missing element: %v", i)
-		}
+		r.Truef(s.Contains(i), "set is missing element: %+v", i)
 	}
 }
 
@@ -472,6 +467,7 @@ func Test_ToSliceDeadlock(t *testing.T) {
 }
 
 func Test_UnmarshalJSON(t *testing.T) {
+	r := require.New(t)
 	s := []byte(`["test", "1", "2", "3"]`) //,["4,5,6"]]`)
 	expected := NewSet(
 		[]String{
@@ -484,16 +480,14 @@ func Test_UnmarshalJSON(t *testing.T) {
 
 	actual := NewSet[String]()
 	err := json.Unmarshal(s, actual)
-	if err != nil {
-		t.Errorf("Error should be nil: %v", err)
-	}
+	r.NoError(err)
 
-	if !expected.Equal(actual) {
-		t.Errorf("Expected no difference, got: %v", expected.Difference(actual))
-	}
+	r.Truef(expected.Equal(actual), "Expected no difference, got: %v", expected.Difference(actual))
 }
 
 func Test_MarshalJSON(t *testing.T) {
+	r := require.New(t)
+
 	expected := NewSet(
 		[]String{
 			String(json.Number("1")),
@@ -509,17 +503,11 @@ func Test_MarshalJSON(t *testing.T) {
 			}...,
 		),
 	)
-	if err != nil {
-		t.Errorf("Error should be nil: %v", err)
-	}
+	r.NoError(err, "marshaling to json")
 
 	actual := NewSet[String]()
 	err = json.Unmarshal(b, actual)
-	if err != nil {
-		t.Errorf("Error should be nil: %v", err)
-	}
+	r.NoError(err, "unmarshaling from json")
 
-	if !expected.Equal(actual) {
-		t.Errorf("Expected no difference, got: %v", expected.Difference(actual))
-	}
+	r.Truef(expected.Equal(actual), "Expected no difference, got: %v", expected.Difference(actual))
 }
