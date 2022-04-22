@@ -27,7 +27,7 @@ package mapset
 
 // Iterator defines an iterator over a Set, its C channel can be used to range over the Set's
 // elements.
-type Iterator[T comparable] struct {
+type Iterator[T EqualKeyer] struct {
 	C    <-chan T
 	stop chan struct{}
 }
@@ -48,7 +48,7 @@ func (i *Iterator[T]) Stop() {
 }
 
 // newIterator returns a new Iterator instance together with its item and stop channels.
-func newIterator[T comparable]() (*Iterator[T], chan<- T, <-chan struct{}) {
+func newIterator[T EqualKeyer]() (*Iterator[T], chan<- T, <-chan struct{}) {
 	itemChan := make(chan T)
 	stopChan := make(chan struct{})
 	return &Iterator[T]{

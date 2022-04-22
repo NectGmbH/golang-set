@@ -33,14 +33,27 @@ type yourType struct {
 	name string
 }
 
+func (i yourType) Equal(jAny any) bool {
+	j, ok := jAny.(yourType)
+	if !ok {
+		return false
+	}
+
+	return i == j
+}
+
+func (i yourType) Key() string {
+	return i.name
+}
+
 func Test_ExampleIterator(t *testing.T) {
 
-	s := NewSet[*yourType](
+	s := NewSet(
 		[]*yourType{
-			&yourType{name: "Alise"},
-			&yourType{name: "Bob"},
-			&yourType{name: "John"},
-			&yourType{name: "Nick"},
+			{name: "Alise"},
+			{name: "Bob"},
+			{name: "John"},
+			{name: "Nick"},
 		}...,
 	)
 

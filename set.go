@@ -35,10 +35,16 @@ SOFTWARE.
 // that can enforce mutual exclusion through other means.
 package mapset
 
+// Comparable
+type EqualKeyer interface {
+	Equal(to any) bool
+	Key() string
+}
+
 // Set is the primary interface provided by the mapset package.  It
 // represents an unordered set of data and a large number of
 // operations that can be applied to that set.
-type Set[T comparable] interface {
+type Set[T EqualKeyer] interface {
 	// Adds an element to the set. Returns whether
 	// the item was added.
 	Add(val T) bool
@@ -51,7 +57,7 @@ type Set[T comparable] interface {
 	Clear()
 
 	// Returns a clone of the set using the same
-	// implementation, duplicating all keys.
+	// implementation, duplicating all elements.
 	Clone() Set[T]
 
 	// Returns whether the given items
@@ -177,7 +183,7 @@ type Set[T comparable] interface {
 
 // NewSet creates and returns a new set with the given elements.
 // Operations on the resulting set are thread-safe.
-func NewSet[T comparable](vals ...T) Set[T] {
+func NewSet[T EqualKeyer](vals ...T) Set[T] {
 	s := newThreadSafeSet[T]()
 	for _, item := range vals {
 		s.Add(item)
@@ -187,7 +193,7 @@ func NewSet[T comparable](vals ...T) Set[T] {
 
 // NewThreadUnsafeSet creates and returns a new set with the given elements.
 // Operations on the resulting set are not thread-safe.
-func NewThreadUnsafeSet[T comparable](vals ...T) Set[T] {
+func NewThreadUnsafeSet[T EqualKeyer](vals ...T) Set[T] {
 	s := newThreadUnsafeSet[T]()
 	for _, item := range vals {
 		s.Add(item)

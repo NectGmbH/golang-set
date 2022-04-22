@@ -27,12 +27,12 @@ package mapset
 
 import "sync"
 
-type threadSafeSet[T comparable] struct {
+type threadSafeSet[T EqualKeyer] struct {
 	sync.RWMutex
 	uss threadUnsafeSet[T]
 }
 
-func newThreadSafeSet[T comparable]() threadSafeSet[T] {
+func newThreadSafeSet[T EqualKeyer]() threadSafeSet[T] {
 	newUss := newThreadUnsafeSet[T]()
 	return threadSafeSet[T]{
 		uss: newUss,
@@ -144,7 +144,7 @@ func (s *threadSafeSet[T]) Clear() {
 
 func (s *threadSafeSet[T]) Remove(v T) {
 	s.Lock()
-	delete(s.uss, v)
+	delete(s.uss, v.Key())
 	s.Unlock()
 }
 
@@ -156,7 +156,7 @@ func (s *threadSafeSet[T]) Cardinality() int {
 
 func (s *threadSafeSet[T]) Each(cb func(T) bool) {
 	s.RLock()
-	for elem := range s.uss {
+	for _, elem := range s.uss {
 		if cb(elem) {
 			break
 		}
@@ -169,7 +169,7 @@ func (s *threadSafeSet[T]) Iter() <-chan T {
 	go func() {
 		s.RLock()
 
-		for elem := range s.uss {
+		for _, elem := range s.uss {
 			ch <- elem
 		}
 		close(ch)
@@ -185,7 +185,7 @@ func (s *threadSafeSet[T]) Iterator() *Iterator[T] {
 	go func() {
 		s.RLock()
 	L:
-		for elem := range s.uss {
+		for _, elem := range s.uss {
 			select {
 			case <-stopCh:
 				break L
@@ -234,13 +234,13 @@ func (s *threadSafeSet[T]) Pop() (T, bool) {
 }
 
 func (s *threadSafeSet[T]) ToSlice() []T {
-	keys := make([]T, 0, s.Cardinality())
+	elems := make([]T, 0, s.Cardinality())
 	s.RLock()
-	for elem := range s.uss {
-		keys = append(keys, elem)
+	for _, elem := range s.uss {
+		elems = append(elems, elem)
 	}
 	s.RUnlock()
-	return keys
+	return elems
 }
 
 func (s *threadSafeSet[T]) MarshalJSON() ([]byte, error) {

@@ -4,7 +4,14 @@
 
 # golang-set
 
+This is a fork of the excellent [deckarep/golang-set](https://github.com/deckarep/golang-set) package with a relaxed type constraint.
+
 The missing `generic` set collection for the Go language.  Until Go has sets built-in...use this.
+
+## Update 4/22/2022
+* Packaged version: `3.0.0` release for struct generics support with breaking changes.
+* supports `new generic` syntax
+* Go `1.18.0` or higher
 
 ## Update 3/26/2022
 * Packaged version: `2.0.0` release for generics support with breaking changes.
@@ -12,9 +19,6 @@ The missing `generic` set collection for the Go language.  Until Go has sets bui
 * Go `1.18.0` or higher
 
 ![With Generics](new_improved.jpeg)
-
-Coming from Python one of the things I miss is the superbly wonderful set collection.  This is my attempt to mimic the primary features of the set collection from Python.
-You can of course argue that there is no need for a set in Go, otherwise the creators would have added one to the standard library.  To those I say simply ignore this repository and carry-on and to the rest that find this useful please contribute in helping me make it better by contributing with suggestions or PRs.
 
 ## Features
 
@@ -25,143 +29,64 @@ You can of course argue that there is no need for a set in Go, otherwise the cre
 * Feature complete set implementation modeled after [Python's set implementation](https://docs.python.org/3/library/stdtypes.html#set).
 * Exhaustive unit-test and benchmark suite
 
-## Trusted by
-
-This package is trusted by many companies and thousands of open-source packages. Here are just a few sample users of this package.
-
-* Notable projects/companies using this package
-  * Ethereum
-  * Docker
-  * 1Password
-  * Hashicorp
-
 ## Usage
 
-The code below demonstrates how a Set collection can better manage data and actually minimize boilerplate and needless loops in code. This package now fully supports *generic* syntax so you are now able to instantiate a collection for any [comparable](https://flaviocopes.com/golang-comparing-values/) type object.
+The code below demonstrates how a Set collection can better manage data and actually minimize boilerplate and needless loops in code. This package now fully supports *generic* syntax so you are now able to instantiate a collection for any Keyable type object (implementing this package's EqualKeyer interface).
 
-What is considered comparable in Go? 
-* `Booleans`, `integers`, `strings`, `floats` or basically primitive types.
-* `Pointers`
-* `Arrays`
-* `Structs` if *all of their fields* are also comparable independently
+The Key returned on an object's Key method must be stable (not change) and unique.
+A good example are uuids for structs.
+As a caveat to the extension to EqualKeyer interface from the comparable type constraint
+is that on changes to a value in the set the key returned by the value's Key() function
+must also change to have a true set implementation.
 
-Using this library is as simple as creating either a threadsafe or non-threadsafe set and providing a `comparable` type for instantiation of the collection.
+Using this library is as simple as creating either a threadsafe or non-threadsafe set and providing a `EqualKeyer` type for instantiation of the collection.
 
 ```go
+
+import (
+    "github.com/google/uuid"
+)
+
+type StructT struct {
+    id uuid.UUID
+}
+
+func (i StructT) Equal(jAny any) bool {
+	j, ok := jAny.(StructT)
+	if !ok {
+		return false
+	}
+
+	return i == j
+}
+
+func (t StructT) Key() string {
+    return t.id.String()
+}
+
 // Syntax example, doesn't compile.
 mySet := mapset.NewSet[T]() // where T is some concrete comparable type.
 
-// Therefore this code creates an int set
-mySet := mapset.NewSet[int]()
+// Therefore this code creates an StructT set
+mySet := mapset.NewSet[StructT]()
 
 // Or perhaps you want a string set
-mySet := mapset.NewSet[string]()
+// Wrap string in a EqualKeyer type
 
-type myStruct {
-  name string
-  age uint8
+type String string
+
+func (i String) Equal(jAny any) bool {
+	j, ok := jAny.(String)
+	if !ok {
+		return false
+	}
+
+	return i == j
 }
 
-// Alternatively a set of structs
-mySet := mapset.NewSet[myStruct]()
-
-// Lastly a set that can hold anything using the any or empty interface keyword: interface{}. This is effectively removes type safety.
-mySet := mapset.NewSet[any]()
-```
-
-## Comprehensive Example
-
-```go
-package main
-
-import (
-  "fmt"
-  mapset "github.com/deckarep/golang-set"
-)
-
-func main() {
-  // Create a string-based set of required classes.
-  required := mapset.NewSet[string]()
-  required.Add("cooking")
-  required.Add("english")
-  required.Add("math")
-  required.Add("biology")
-
-  // Create a string-based set of science classes.
-  sciences := mapset.NewSet[string]()
-  sciences.Add("biology")
-  sciences.Add("chemistry")
-  
-  // Create a string-based set of electives.
-  electives := mapset.NewSet[string]()
-  electives.Add("welding")
-  electives.Add("music")
-  electives.Add("automotive")
-
-  // Create a string-based set of bonus programming classes.
-  bonus := mapset.NewSet[string]()
-  bonus.Add("beginner go")
-  bonus.Add("python for dummies")
+func (s String) Key() string {
+    return string(s)
 }
+
+mySet := mapset.NewSet[String]()
 ```
-
-Create a set of all unique classes.
-Sets will *automatically* deduplicate the same data.
-
-```go
-  all := required
-    .Union(sciences)
-    .Union(electives)
-    .Union(bonus)
-  
-  fmt.Println(all)
-```
-
-Output:
-```sh
-Set{cooking, english, math, chemistry, welding, biology, music, automotive, beginner go, python for dummies}
-```
-
-Is cooking considered a science class?
-```go
-result := sciences.Contains("cooking")
-fmt.Println(result)
-```
-
-Output:
-```false
-false
-```
-
-Show me all classes that are not science classes, since I don't enjoy science.
-```go
-notScience := all.Difference(sciences)
-fmt.Println(notScience)
-```
-
-```sh
-Set{ music, automotive, beginner go, python for dummies, cooking, english, math, welding }
-```
-
-Which science classes are also required classes?
-```go
-reqScience := sciences.Intersect(required)
-```
-
-Output:
-```sh
-Set{biology}
-```
-
-How many bonus classes do you offer?
-```go
-fmt.Println(bonus.Cardinality())
-```
-Output:
-```sh
-2
-```
-
-Thanks for visiting!
-
--deckarep

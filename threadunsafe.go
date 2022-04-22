@@ -32,18 +32,33 @@ import (
 	"strings"
 )
 
-type threadUnsafeSet[T comparable] map[T]struct{}
+type threadUnsafeSet[T EqualKeyer] map[string]T
+
+type String string
+
+func (i String) Equal(jAny any) bool {
+	j, ok := jAny.(String)
+	if !ok {
+		return false
+	}
+
+	return i == j
+}
+
+func (i String) Key() string {
+	return string(i)
+}
 
 // Assert concrete type:threadUnsafeSet adheres to Set interface.
-var _ Set[string] = (*threadUnsafeSet[string])(nil)
+var _ Set[String] = (*threadUnsafeSet[String])(nil)
 
-func newThreadUnsafeSet[T comparable]() threadUnsafeSet[T] {
+func newThreadUnsafeSet[T EqualKeyer]() threadUnsafeSet[T] {
 	return make(threadUnsafeSet[T])
 }
 
 func (s *threadUnsafeSet[T]) Add(v T) bool {
 	prevLen := len(*s)
-	(*s)[v] = struct{}{}
+	(*s)[v.Key()] = v
 	return prevLen != len(*s)
 }
 
@@ -57,7 +72,7 @@ func (s *threadUnsafeSet[T]) Clear() {
 
 func (s *threadUnsafeSet[T]) Clone() Set[T] {
 	clonedSet := newThreadUnsafeSet[T]()
-	for elem := range *s {
+	for _, elem := range *s {
 		clonedSet.Add(elem)
 	}
 	return &clonedSet
@@ -65,7 +80,8 @@ func (s *threadUnsafeSet[T]) Clone() Set[T] {
 
 func (s *threadUnsafeSet[T]) Contains(v ...T) bool {
 	for _, val := range v {
-		if _, ok := (*s)[val]; !ok {
+		// TODO: key collision ?
+		if vSet, ok := (*s)[val.Key()]; !ok || !vSet.Equal(val) {
 			return false
 		}
 	}
@@ -76,7 +92,7 @@ func (s *threadUnsafeSet[T]) Difference(other Set[T]) Set[T] {
 	_ = other.(*threadUnsafeSet[T])
 
 	diff := newThreadUnsafeSet[T]()
-	for elem := range *s {
+	for _, elem := range *s {
 		if !other.Contains(elem) {
 			diff.Add(elem)
 		}
@@ -85,7 +101,7 @@ func (s *threadUnsafeSet[T]) Difference(other Set[T]) Set[T] {
 }
 
 func (s *threadUnsafeSet[T]) Each(cb func(T) bool) {
-	for elem := range *s {
+	for _, elem := range *s {
 		if cb(elem) {
 			break
 		}
@@ -98,7 +114,7 @@ func (s *threadUnsafeSet[T]) Equal(other Set[T]) bool {
 	if s.Cardinality() != other.Cardinality() {
 		return false
 	}
-	for elem := range *s {
+	for _, elem := range *s {
 		if !other.Contains(elem) {
 			return false
 		}
@@ -112,13 +128,13 @@ func (s *threadUnsafeSet[T]) Intersect(other Set[T]) Set[T] {
 	intersection := newThreadUnsafeSet[T]()
 	// loop over smaller set
 	if s.Cardinality() < other.Cardinality() {
-		for elem := range *s {
+		for _, elem := range *s {
 			if other.Contains(elem) {
 				intersection.Add(elem)
 			}
 		}
 	} else {
-		for elem := range *o {
+		for _, elem := range *o {
 			if s.Contains(elem) {
 				intersection.Add(elem)
 			}
@@ -140,7 +156,7 @@ func (s *threadUnsafeSet[T]) IsSubset(other Set[T]) bool {
 	if s.Cardinality() > other.Cardinality() {
 		return false
 	}
-	for elem := range *s {
+	for _, elem := range *s {
 		if !other.Contains(elem) {
 			return false
 		}
@@ -155,7 +171,7 @@ func (s *threadUnsafeSet[T]) IsSuperset(other Set[T]) bool {
 func (s *threadUnsafeSet[T]) Iter() <-chan T {
 	ch := make(chan T)
 	go func() {
-		for elem := range *s {
+		for _, elem := range *s {
 			ch <- elem
 		}
 		close(ch)
@@ -169,7 +185,7 @@ func (s *threadUnsafeSet[T]) Iterator() *Iterator[T] {
 
 	go func() {
 	L:
-		for elem := range *s {
+		for _, elem := range *s {
 			select {
 			case <-stopCh:
 				break L
@@ -184,21 +200,21 @@ func (s *threadUnsafeSet[T]) Iterator() *Iterator[T] {
 
 // TODO: how can we make this properly , return T but can't return nil.
 func (s *threadUnsafeSet[T]) Pop() (v T, ok bool) {
-	for item := range *s {
-		delete(*s, item)
+	for key, item := range *s {
+		delete(*s, key)
 		return item, true
 	}
 	return
 }
 
 func (s *threadUnsafeSet[T]) Remove(v T) {
-	delete(*s, v)
+	delete(*s, v.Key())
 }
 
 func (s *threadUnsafeSet[T]) String() string {
 	items := make([]string, 0, len(*s))
 
-	for elem := range *s {
+	for _, elem := range *s {
 		items = append(items, fmt.Sprintf("%v", elem))
 	}
 	return fmt.Sprintf("Set{%s}", strings.Join(items, ", "))
@@ -213,12 +229,12 @@ func (s *threadUnsafeSet[T]) SymmetricDifference(other Set[T]) Set[T] {
 }
 
 func (s *threadUnsafeSet[T]) ToSlice() []T {
-	keys := make([]T, 0, s.Cardinality())
-	for elem := range *s {
-		keys = append(keys, elem)
+	elems := make([]T, 0, s.Cardinality())
+	for _, elem := range *s {
+		elems = append(elems, elem)
 	}
 
-	return keys
+	return elems
 }
 
 func (s *threadUnsafeSet[T]) Union(other Set[T]) Set[T] {
@@ -226,10 +242,10 @@ func (s *threadUnsafeSet[T]) Union(other Set[T]) Set[T] {
 
 	unionedSet := newThreadUnsafeSet[T]()
 
-	for elem := range *s {
+	for _, elem := range *s {
 		unionedSet.Add(elem)
 	}
-	for elem := range *o {
+	for _, elem := range *o {
 		unionedSet.Add(elem)
 	}
 	return &unionedSet
@@ -239,7 +255,7 @@ func (s *threadUnsafeSet[T]) Union(other Set[T]) Set[T] {
 func (s *threadUnsafeSet[T]) MarshalJSON() ([]byte, error) {
 	items := make([]string, 0, s.Cardinality())
 
-	for elem := range *s {
+	for _, elem := range *s {
 		b, err := json.Marshal(elem)
 		if err != nil {
 			return nil, err
